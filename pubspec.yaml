@@ -1,0 +1,25 @@
+name: libyapost_delivery
+description: Libya Post Delivery Staff App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.4
+  signature: ^5.4.0
+  mobile_scanner: ^3.5.5
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.jpg
+  generate: true

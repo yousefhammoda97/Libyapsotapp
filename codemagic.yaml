@@ -1,0 +1,38 @@
+workflows:
+  android-release:
+    name: Libya Post - Android Release
+    max_build_duration: 60
+    environment:
+      flutter: stable
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    scripts:
+      - name: Get Flutter version
+        script: flutter --version
+
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Build APK (debug)
+        script: |
+          flutter build apk --debug \
+            --build-name=1.0.0 \
+            --build-number=$BUILD_NUMBER \
+            --android-skip-build-dependency-validation
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
+
+    publishing:
+      email:
+        recipients:
+          - your@email.com
+        notify:
+          success: true
+          failure: true

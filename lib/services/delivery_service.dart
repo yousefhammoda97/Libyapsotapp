@@ -21,28 +21,39 @@ class DeliveryService {
     try {
       final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/deliver.php'));
       request.headers.addAll(await _authHeaders());
-      request.followRedirects = false; // ← don't follow 302 redirects
+      request.followRedirects = false;
 
       request.fields['item_id'] = itemId.toUpperCase();
       request.fields['delivery_status'] = 'delivered';
-      request.fields['signatory_name'] = signatoryName;
+      request.fields['signatory_name'] = signatoryName.isEmpty ? '.' : signatoryName;
       request.fields['office_cd'] = officeCd;
       if (signatureBase64 != null) {
         request.fields['sign_image_data'] = signatureBase64;
       }
-      request.files.add(await http.MultipartFile.fromPath('sign_image', proofImage.path));
+      request.files.add(await http.MultipartFile.fromPath(
+        'sign_image',
+        proofImage.path,
+        filename: 'proof.jpg',
+      ));
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final body = await streamed.stream.bytesToString();
 
-      // 200 = JSON success from our app path
-      // 302 = redirect means the web path ran but data was saved successfully
-      if (response.statusCode == 200 || response.statusCode == 302) {
-        return {'success': true};
+      // 302 = web redirect = data saved successfully via web flow
+      if (streamed.statusCode == 302) return {'success': true};
+
+      // Try to parse JSON response
+      if (body.isNotEmpty) {
+        try {
+          final data = jsonDecode(body);
+          if (data['success'] == true) return {'success': true};
+          return {'success': false, 'message': data['message'] ?? 'خطأ في الخادم'};
+        } catch (_) {}
       }
-      if (response.statusCode == 401) {
-        return {'success': false, 'message': 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'relogin': true};
-      }
-      return {'success': false, 'message': 'خطأ في الخادم: ${response.statusCode}'};
+
+      if (streamed.statusCode == 200) return {'success': true};
+      if (streamed.statusCode == 401) return {'success': false, 'message': 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'relogin': 'true'};
+      return {'success': false, 'message': 'خطأ في الخادم: ${streamed.statusCode}\n$body'};
     } catch (e) {
       return {'success': false, 'message': 'تعذّر الاتصال بالخادم'};
     }
@@ -59,28 +70,39 @@ class DeliveryService {
     try {
       final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/deliver.php'));
       request.headers.addAll(await _authHeaders());
-      request.followRedirects = false; // ← don't follow 302 redirects
+      request.followRedirects = false;
 
       request.fields['item_id'] = itemId.toUpperCase();
       request.fields['delivery_status'] = 'not_delivered';
       request.fields['office_cd'] = officeCd;
       request.fields['non_delivery_reason'] = reason;
       request.fields['non_delivery_measure'] = measure;
+      request.fields['signatory_name'] = '.';
       if (otherReason != null) request.fields['other_reason'] = otherReason;
       if (failPhoto != null) {
-        request.files.add(await http.MultipartFile.fromPath('fail_image', failPhoto.path));
+        request.files.add(await http.MultipartFile.fromPath(
+          'fail_image',
+          failPhoto.path,
+          filename: 'fail.jpg',
+        ));
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final body = await streamed.stream.bytesToString();
 
-      // 200 = JSON success, 302 = web redirect but data saved OK
-      if (response.statusCode == 200 || response.statusCode == 302) {
-        return {'success': true};
+      if (streamed.statusCode == 302) return {'success': true};
+
+      if (body.isNotEmpty) {
+        try {
+          final data = jsonDecode(body);
+          if (data['success'] == true) return {'success': true};
+          return {'success': false, 'message': data['message'] ?? 'خطأ في الخادم'};
+        } catch (_) {}
       }
-      if (response.statusCode == 401) {
-        return {'success': false, 'message': 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'relogin': true};
-      }
-      return {'success': false, 'message': 'خطأ في الخادم: ${response.statusCode}'};
+
+      if (streamed.statusCode == 200) return {'success': true};
+      if (streamed.statusCode == 401) return {'success': false, 'message': 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى', 'relogin': 'true'};
+      return {'success': false, 'message': 'خطأ في الخادم: ${streamed.statusCode}\n$body'};
     } catch (e) {
       return {'success': false, 'message': 'تعذّر الاتصال بالخادم'};
     }
@@ -90,16 +112,10 @@ class DeliveryService {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/deliver.php?ajax=last_items'),
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          ...await _authHeaders(),
-        },
+        headers: {'X-Requested-With': 'XMLHttpRequest', ...await _authHeaders()},
       ).timeout(const Duration(seconds: 15));
-
       final data = jsonDecode(response.body);
-      if (data['ok'] == true) {
-        return List<Map<String, dynamic>>.from(data['items']);
-      }
+      if (data['ok'] == true) return List<Map<String, dynamic>>.from(data['items']);
       return [];
     } catch (e) {
       return [];

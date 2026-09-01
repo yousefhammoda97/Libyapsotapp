@@ -13,7 +13,11 @@ class AuthService {
   static const _keySavedUser = 'saved_username';
   static const _keySavedPass = 'saved_password';
 
-  static Future<Map<String, dynamic>> login(String username, String password, {bool rememberMe = false}) async {
+  // Default office for ALL users
+  static const String defaultOffice = 'LYCPO';
+
+  static Future<Map<String, dynamic>> login(String username, String password,
+      {bool rememberMe = false}) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api_login.php'),
@@ -28,7 +32,8 @@ class AuthService {
         await prefs.setString(_keyUserId, data['user_id'].toString());
         await prefs.setString(_keyUsername, data['username'] ?? username);
         await prefs.setString(_keyRole, data['role'] ?? 'delivery');
-        await prefs.setString(_keyOffice, data['post_office_code'] ?? '');
+        // Always set LYCPO as the default office regardless of server value
+        await prefs.setString(_keyOffice, defaultOffice);
 
         await prefs.setBool(_keyRemember, rememberMe);
         if (rememberMe) {
@@ -40,7 +45,10 @@ class AuthService {
         }
         return {'success': true};
       }
-      return {'success': false, 'message': data['message'] ?? 'فشل تسجيل الدخول'};
+      return {
+        'success': false,
+        'message': data['message'] ?? 'فشل تسجيل الدخول'
+      };
     } catch (e) {
       return {'success': false, 'message': 'تعذّر الاتصال بالخادم'};
     }
@@ -72,8 +80,8 @@ class AuthService {
   }
 
   static Future<String> getOffice() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyOffice) ?? '';
+    // Always return LYCPO as default
+    return defaultOffice;
   }
 
   static Future<void> logout() async {
@@ -81,10 +89,7 @@ class AuthService {
     final remember = prefs.getBool(_keyRemember) ?? false;
     final savedUser = prefs.getString(_keySavedUser);
     final savedPass = prefs.getString(_keySavedPass);
-
     await prefs.clear();
-
-    // Preserve remembered credentials across logout if "remember me" was checked
     if (remember && savedUser != null && savedPass != null) {
       await prefs.setBool(_keyRemember, true);
       await prefs.setString(_keySavedUser, savedUser);
